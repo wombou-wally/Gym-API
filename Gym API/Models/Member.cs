@@ -5,8 +5,10 @@
         public int Id { get; set; }
         public required string Name { get; set; }
         public required string Email { get; set; }
-        public string? Phone {  get; set; }
+        public string? Phone { get; set; }
         public DateOnly JoinDate { get; set; }
-        public bool IsActive { get; set; }  
+        public bool IsActive { get; set; }
+        public int? MembershipPlanId { get; set; }
+        public MembershipPlan? MembershipPlan { get; set; }
     }
 }

@@ -59,7 +59,6 @@ namespace Gym_API.Controllers
                 old.Email = member.Email;
                 old.Phone = member.Phone;
                 old.JoinDate = member.JoinDate;
-                old.IsActive = member.IsActive;
                 await _context.SaveChangesAsync();
                 return NoContent();
         }

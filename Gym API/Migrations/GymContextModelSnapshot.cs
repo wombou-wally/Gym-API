@@ -40,6 +40,9 @@ namespace Gym_API.Migrations
                     b.Property<DateOnly>("JoinDate")
                         .HasColumnType("date");
 
+                    b.Property<int?>("MembershipPlanId")
+                        .HasColumnType("integer");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text");
@@ -49,7 +52,46 @@ namespace Gym_API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("MembershipPlanId");
+
                     b.ToTable("Members");
+                });
+
+            modelBuilder.Entity("Gym_API.Models.MembershipPlan", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("DurationDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Price")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Plans");
+                });
+
+            modelBuilder.Entity("Gym_API.Models.Member", b =>
+                {
+                    b.HasOne("Gym_API.Models.MembershipPlan", "MembershipPlan")
+                        .WithMany("Members")
+                        .HasForeignKey("MembershipPlanId");
+
+                    b.Navigation("MembershipPlan");
+                });
+
+            modelBuilder.Entity("Gym_API.Models.MembershipPlan", b =>
+                {
+                    b.Navigation("Members");
                 });
 #pragma warning restore 612, 618
         }
