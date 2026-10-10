@@ -9,6 +9,7 @@ namespace Gym_API.Data
     {
         public DbSet<Member> Members { get; set; }
         public DbSet<MembershipPlan> Plans { get; set; }
+        public DbSet<CheckIn> CheckIns { get; set; }
         public GymContext(DbContextOptions<GymContext> options) : base(options)
         {
             

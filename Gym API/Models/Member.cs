@@ -1,4 +1,6 @@
-﻿namespace Gym_API.Models
+﻿using System.Text.Json.Serialization;
+
+namespace Gym_API.Models
 {
     public class Member
     {
@@ -10,5 +12,7 @@
         public bool IsActive { get; set; }
         public int? MembershipPlanId { get; set; }
         public MembershipPlan? MembershipPlan { get; set; }
+        [JsonIgnore]
+        public List<CheckIn> CheckIns { get; set; } = [];
     }
 }

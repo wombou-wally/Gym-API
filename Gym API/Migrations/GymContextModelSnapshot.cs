@@ -22,6 +22,27 @@ namespace Gym_API.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Gym_API.Models.CheckIn", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CheckInTime")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("MemberId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("MemberId");
+
+                    b.ToTable("CheckIns");
+                });
+
             modelBuilder.Entity("Gym_API.Models.Member", b =>
                 {
                     b.Property<int>("Id")
@@ -80,6 +101,17 @@ namespace Gym_API.Migrations
                     b.ToTable("Plans");
                 });
 
+            modelBuilder.Entity("Gym_API.Models.CheckIn", b =>
+                {
+                    b.HasOne("Gym_API.Models.Member", "member")
+                        .WithMany("CheckIns")
+                        .HasForeignKey("MemberId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("member");
+                });
+
             modelBuilder.Entity("Gym_API.Models.Member", b =>
                 {
                     b.HasOne("Gym_API.Models.MembershipPlan", "MembershipPlan")
@@ -87,6 +119,11 @@ namespace Gym_API.Migrations
                         .HasForeignKey("MembershipPlanId");
 
                     b.Navigation("MembershipPlan");
+                });
+
+            modelBuilder.Entity("Gym_API.Models.Member", b =>
+                {
+                    b.Navigation("CheckIns");
                 });
 
             modelBuilder.Entity("Gym_API.Models.MembershipPlan", b =>

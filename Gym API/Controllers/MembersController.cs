@@ -102,5 +102,20 @@ namespace Gym_API.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+        [HttpGet("{id}/checkins")]
+        public async Task<ActionResult<IEnumerable<CheckIn>>> History(int id)
+        {
+            bool memberExists = await _context.Members.AnyAsync(m => m.Id == id);
+            if (!memberExists)
+            {
+                return NotFound();
+            }
+
+            var checkIns = await _context.CheckIns
+                .Where(c => c.MemberId == id)
+                .OrderByDescending(c => c.CheckInTime)
+                .ToListAsync();
+            return Ok(checkIns);
+        }
     }
 }
