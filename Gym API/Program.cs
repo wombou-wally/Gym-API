@@ -14,11 +14,13 @@ builder.Services.AddDbContext<GymContext>(options => options.UseNpgsql(builder.C
 
 var app = builder.Build();
 
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
     app.MapScalarApiReference();
+   
 }
 
 app.UseHttpsRedirection();

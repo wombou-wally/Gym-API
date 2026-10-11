@@ -21,6 +21,7 @@ namespace Gym_API.Controllers
         {
             var members = await _context.Members
                 .Include(m => m.MembershipPlan)
+                .Include(m => m.Trainers)
                 .OrderBy(m => m.Id)
                 .ToListAsync();
             return Ok(members);
@@ -31,6 +32,7 @@ namespace Gym_API.Controllers
         {
             var member = await _context.Members
                 .Include(m => m.MembershipPlan)
+                .Include(m => m.Trainers)
                 .FirstOrDefaultAsync(m => m.Id == id);
 
             if (member == null)
@@ -116,6 +118,32 @@ namespace Gym_API.Controllers
                 .OrderByDescending(c => c.CheckInTime)
                 .ToListAsync();
             return Ok(checkIns);
+        }
+        [HttpPost("{id}/trainers/{trainerId}")]
+        public async Task<IActionResult> AssignTrainer(int id, int trainerId)
+        {
+            var member = await _context.Members
+                .Include(m => m.Trainers)
+                .FirstOrDefaultAsync(m => m.Id == id);
+            if (member == null)
+            {
+                return NotFound();
+            }
+
+            var trainer = await _context.Trainers.FindAsync(trainerId);
+            if (trainer == null)
+            {
+                return NotFound();
+            }
+
+            if (member.Trainers.Any(t => t.Id == trainerId))
+            {
+                return Conflict("Trainer already assigned.");
+            }
+
+            member.Trainers.Add(trainer);
+            await _context.SaveChangesAsync();
+            return NoContent();
         }
     }
 }

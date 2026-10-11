@@ -14,5 +14,6 @@ namespace Gym_API.Models
         public MembershipPlan? MembershipPlan { get; set; }
         [JsonIgnore]
         public List<CheckIn> CheckIns { get; set; } = [];
+        public List<Trainer> Trainers { get; set; } = [];
     }
 }

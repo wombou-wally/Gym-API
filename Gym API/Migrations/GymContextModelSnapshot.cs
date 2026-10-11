@@ -101,6 +101,48 @@ namespace Gym_API.Migrations
                     b.ToTable("Plans");
                 });
 
+            modelBuilder.Entity("Gym_API.Models.Trainer", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Speciality")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Trainers");
+                });
+
+            modelBuilder.Entity("MemberTrainer", b =>
+                {
+                    b.Property<int>("MembersId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("TrainersId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("MembersId", "TrainersId");
+
+                    b.HasIndex("TrainersId");
+
+                    b.ToTable("MemberTrainer");
+                });
+
             modelBuilder.Entity("Gym_API.Models.CheckIn", b =>
                 {
                     b.HasOne("Gym_API.Models.Member", "member")
@@ -119,6 +161,21 @@ namespace Gym_API.Migrations
                         .HasForeignKey("MembershipPlanId");
 
                     b.Navigation("MembershipPlan");
+                });
+
+            modelBuilder.Entity("MemberTrainer", b =>
+                {
+                    b.HasOne("Gym_API.Models.Member", null)
+                        .WithMany()
+                        .HasForeignKey("MembersId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Gym_API.Models.Trainer", null)
+                        .WithMany()
+                        .HasForeignKey("TrainersId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Gym_API.Models.Member", b =>
