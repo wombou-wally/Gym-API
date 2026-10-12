@@ -1,4 +1,5 @@
 ﻿using Gym_API.Data;
+using Gym_API.DTOs;
 using Gym_API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -17,16 +18,31 @@ namespace Gym_API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<CheckIn>>> GetCheckIns()
+        public async Task<ActionResult<IEnumerable<CheckInResponse>>> GetCheckIns()
         {
-            var checks = await _context.CheckIns.OrderBy(c => c.Id).ToListAsync();
+            var checks = await _context.CheckIns
+                .OrderBy(c => c.Id)
+                .Select(c => new CheckInResponse
+                {
+                    Id = c.Id,
+                    MemberId = c.MemberId,
+                    CheckInTime = c.CheckInTime,
+                }).ToListAsync();
             return Ok(checks);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult> GetCheckIn(int id)
+        public async Task<ActionResult<CheckInResponse>> GetCheckIn(int id)
         {
-            var check = await _context.CheckIns.FindAsync(id);
+            var check = await _context.CheckIns
+                .Where(c => c.Id == id)
+                .Select(c => new CheckInResponse
+                {
+                    Id = c.Id,
+                    MemberId = c.MemberId,
+                    CheckInTime = c.CheckInTime,
+                }
+                ).FirstOrDefaultAsync();
             if (check == null)
             {
                 return NotFound();
@@ -34,20 +50,32 @@ namespace Gym_API.Controllers
             return Ok(check);
         }
         [HttpPost]
-        public async Task<ActionResult<CheckIn>> PostCheckIn(CheckIn checkIn)
-        {
-            bool memberExists = await _context.Members.AnyAsync(m => m.Id == checkIn.MemberId);
+        public async Task<ActionResult<CheckInResponse>> PostCheckIn(CreateCheckInRequest request)
+        { 
+            bool memberExists = await _context.Members.AnyAsync(m => m.Id == request.MemberId);
             if (!memberExists)
             {
                 return BadRequest("Member does not exist.");
             }
+            var checkIn = new CheckIn
+            {
 
-            checkIn.member = null;
-            checkIn.CheckInTime = DateTime.UtcNow;
+                MemberId = request.MemberId,
+                CheckInTime = DateTime.UtcNow
+            };
+
+            
+            
 
             _context.CheckIns.Add(checkIn);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetCheckIn), new { id = checkIn.Id }, checkIn);
+            var response = new CheckInResponse
+            {
+                Id = checkIn.Id,
+                MemberId = checkIn.MemberId,
+                CheckInTime = checkIn.CheckInTime
+            };
+            return CreatedAtAction(nameof(GetCheckIn), new { id = checkIn.Id }, response);
         }
     }
 }

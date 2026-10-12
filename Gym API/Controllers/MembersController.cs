@@ -1,4 +1,5 @@
 ﻿using Gym_API.Data;
+using Gym_API.DTOs;
 using Gym_API.Models;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -16,24 +17,69 @@ namespace Gym_API.Controllers
             _context = context;
         }
 
-        [HttpGet]
-        public async Task<ActionResult<IEnumerable<Member>>> GetMembers()
+        private IQueryable<MemberResponse> MemberResponses()
         {
-            var members = await _context.Members
-                .Include(m => m.MembershipPlan)
-                .Include(m => m.Trainers)
+            return _context.Members
                 .OrderBy(m => m.Id)
-                .ToListAsync();
+                .Select(m => new MemberResponse
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    Email = m.Email,
+                    Phone = m.Phone,
+                    JoinDate = m.JoinDate,
+                    IsActive = m.IsActive,
+                    Plan = m.MembershipPlan == null ? null : new PlanSummary
+                        {   
+                            Name = m.MembershipPlan.Name,
+                            Price = m.MembershipPlan.Price
+                        },
+                    Trainers = m.Trainers
+                        .Select(t => new TrainerSummary
+                        {
+                            Id = t.Id,
+                            Name = t.Name,
+                            Speciality = t.Speciality
+                        })
+                        .ToList()
+                });
+        }
+
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<MemberResponse>>> GetMembers()
+        {
+            var members = await MemberResponses().ToListAsync();
             return Ok(members);
         }
 
         [HttpGet("{id}")]
-        public async Task<ActionResult<Member>> GetMember(int id)
+        public async Task<ActionResult<MemberResponse>> GetMember(int id)
         {
             var member = await _context.Members
-                .Include(m => m.MembershipPlan)
-                .Include(m => m.Trainers)
-                .FirstOrDefaultAsync(m => m.Id == id);
+                .Where(m => m.Id == id)
+                .Select(m => new MemberResponse
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    Email = m.Email,
+                    Phone = m.Phone,
+                    JoinDate = m.JoinDate,
+                    IsActive = m.IsActive,
+                    Plan = m.MembershipPlan == null ? null : new PlanSummary
+                        {
+                            Name = m.MembershipPlan.Name,
+                            Price = m.MembershipPlan.Price
+                        },
+                    Trainers = m.Trainers
+                        .Select(t => new TrainerSummary
+                        {
+                            Id = t.Id,
+                            Name = t.Name,
+                            Speciality = t.Speciality
+                        })
+                        .ToList()
+                })
+                .FirstOrDefaultAsync();
 
             if (member == null)
             {
@@ -43,27 +89,34 @@ namespace Gym_API.Controllers
         }
 
         [HttpPost]
-        public async Task<ActionResult<Member>> PostMember(Member member)
+        public async Task<ActionResult<MemberResponse>> PostMember(CreateMemberRequest request)
         {
-            if (member.MembershipPlanId != null)
+            if (request.MembershipPlanId != null)
             {
-                bool planExists = await _context.Plans.AnyAsync(p => p.Id == member.MembershipPlanId);
+                bool planExists = await _context.Plans.AnyAsync(p => p.Id == request.MembershipPlanId);
                 if (!planExists)
                 {
                     return BadRequest("Plan does not exist.");
                 }
             }
 
-            // Ignore any nested plan object; only MembershipPlanId decides the plan.
-            member.MembershipPlan = null;
+            var member = new Member
+            {
+                Name = request.Name,
+                Email = request.Email,
+                Phone = request.Phone,
+                JoinDate = request.JoinDate,
+                MembershipPlanId = request.MembershipPlanId,
+                IsActive = true
+            };
 
             _context.Members.Add(member);
             await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetMember), new { id = member.Id }, member);
+            return CreatedAtAction(nameof(GetMember), new { id = member.Id }, null);
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateMember(int id, Member member)
+        public async Task<IActionResult> UpdateMember(int id, UpdateMemberRequest request)
         {
             var existing = await _context.Members.FindAsync(id);
             if (existing == null)
@@ -71,21 +124,19 @@ namespace Gym_API.Controllers
                 return NotFound();
             }
 
-            if (member.MembershipPlanId != null)
+            if (request.MembershipPlanId != null)
             {
-                bool planExists = await _context.Plans.AnyAsync(p => p.Id == member.MembershipPlanId);
+                bool planExists = await _context.Plans.AnyAsync(p => p.Id == request.MembershipPlanId);
                 if (!planExists)
                 {
                     return BadRequest("Plan does not exist.");
                 }
             }
 
-            existing.Name = member.Name;
-            existing.Email = member.Email;
-            existing.Phone = member.Phone;
-            existing.JoinDate = member.JoinDate;
-            existing.IsActive = member.IsActive;
-            existing.MembershipPlanId = member.MembershipPlanId;
+            existing.Name = request.Name;
+            existing.Email = request.Email;
+            existing.Phone = request.Phone;
+            existing.MembershipPlanId = request.MembershipPlanId;
 
             await _context.SaveChangesAsync();
             return NoContent();
@@ -104,8 +155,9 @@ namespace Gym_API.Controllers
             await _context.SaveChangesAsync();
             return NoContent();
         }
+
         [HttpGet("{id}/checkins")]
-        public async Task<ActionResult<IEnumerable<CheckIn>>> History(int id)
+        public async Task<ActionResult<IEnumerable<CheckInResponse>>> History(int id)
         {
             bool memberExists = await _context.Members.AnyAsync(m => m.Id == id);
             if (!memberExists)
@@ -116,9 +168,16 @@ namespace Gym_API.Controllers
             var checkIns = await _context.CheckIns
                 .Where(c => c.MemberId == id)
                 .OrderByDescending(c => c.CheckInTime)
-                .ToListAsync();
+                .Select(c => new CheckInResponse
+                {
+                    Id= c.Id,
+                    MemberId = c.MemberId,
+                    CheckInTime = c.CheckInTime
+                }
+                ).ToListAsync();
             return Ok(checkIns);
         }
+
         [HttpPost("{id}/trainers/{trainerId}")]
         public async Task<IActionResult> AssignTrainer(int id, int trainerId)
         {
