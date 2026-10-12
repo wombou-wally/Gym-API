@@ -15,5 +15,6 @@ namespace Gym_API.Models
         [JsonIgnore]
         public List<CheckIn> CheckIns { get; set; } = [];
         public List<Trainer> Trainers { get; set; } = [];
+        public DateOnly? ExpiryDate { get; set;}
     }
 }

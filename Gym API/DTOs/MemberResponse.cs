@@ -13,6 +13,6 @@ namespace Gym_API.DTOs
         public bool IsActive { get; set; }
         public PlanSummary? Plan { get; set; }
         public List<TrainerSummary> Trainers { get; set; } = [];
-
+        public DateOnly? ExpiryDate { get; set; }
     }
 }

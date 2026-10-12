@@ -29,6 +29,7 @@ namespace Gym_API.Controllers
                     Phone = m.Phone,
                     JoinDate = m.JoinDate,
                     IsActive = m.IsActive,
+                    ExpiryDate = m.ExpiryDate,
                     Plan = m.MembershipPlan == null ? null : new PlanSummary
                         {   
                             Name = m.MembershipPlan.Name,
@@ -65,6 +66,7 @@ namespace Gym_API.Controllers
                     Phone = m.Phone,
                     JoinDate = m.JoinDate,
                     IsActive = m.IsActive,
+                    ExpiryDate = m.ExpiryDate,
                     Plan = m.MembershipPlan == null ? null : new PlanSummary
                         {
                             Name = m.MembershipPlan.Name,
@@ -203,6 +205,35 @@ namespace Gym_API.Controllers
             member.Trainers.Add(trainer);
             await _context.SaveChangesAsync();
             return NoContent();
+        }
+
+        [HttpPost("{id}/renew")]
+        public async Task<ActionResult<RenewResponse>> Renew(int id)
+        {
+            var member
+                = await _context.Members
+                .Include(m => m.MembershipPlan)
+                .FirstOrDefaultAsync(m => m.Id == id);
+            if (member == null)
+                return NotFound();
+            if (member.MembershipPlan == null)
+                return BadRequest("member has no plan");
+            DateOnly StartDate = DateOnly.FromDateTime(DateTime.Now);
+            if(member.ExpiryDate != null && member.ExpiryDate.Value > StartDate)
+            {
+                 StartDate = member.ExpiryDate.Value;
+            }
+            member.ExpiryDate = StartDate.AddDays(member.MembershipPlan.DurationDays);
+            member.IsActive = true;
+            await _context.SaveChangesAsync();
+
+            return Ok(new RenewResponse
+            {
+                MemberId = member.Id,
+                ExpiryDate = member.ExpiryDate,
+                IsActive = member.IsActive
+            });
+
         }
     }
 }
