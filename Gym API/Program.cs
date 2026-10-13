@@ -1,4 +1,5 @@
 using Gym_API.Data;
+using Gym_API.ExceptionHandling;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Scalar.AspNetCore;
@@ -9,12 +10,14 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.AddDbContext<GymContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("GymDb")));
 
 var app = builder.Build();
 
-
+app.UseExceptionHandler();
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
