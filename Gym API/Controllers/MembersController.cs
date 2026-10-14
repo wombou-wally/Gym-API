@@ -1,6 +1,7 @@
 ﻿using Gym_API.Data;
 using Gym_API.DTOs;
 using Gym_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -145,8 +146,10 @@ namespace Gym_API.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<IActionResult> DeleteMember(int id)
         {
+
             var member = await _context.Members.FindAsync(id);
             if (member == null)
             {
