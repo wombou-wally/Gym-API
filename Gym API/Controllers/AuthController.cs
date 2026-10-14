@@ -106,6 +106,7 @@ namespace Gym_API.Controllers
             if(r == true)
             {
                 return Conflict("Email Already Assoicated to an Account");
+               
             }
 
             var user = new User

@@ -1,6 +1,7 @@
 ﻿using Gym_API.Data;
 using Gym_API.DTOs;
 using Gym_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Gym_API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class PlansController : ControllerBase
     {
         private readonly GymContext _context;
@@ -55,6 +57,7 @@ namespace Gym_API.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<ActionResult<PlansResponse>> PostPlan(CreatePlanRequest request)
         {
             var plan = new MembershipPlan
@@ -78,6 +81,7 @@ namespace Gym_API.Controllers
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<IActionResult> UpdatePlan(int id, UpdatePlanRequest request)
         {
             var existing = await _context.Plans.FindAsync(id);
@@ -95,6 +99,7 @@ namespace Gym_API.Controllers
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<IActionResult> DeletePlan(int id)
         {
             var plan = await _context.Plans.FindAsync(id);

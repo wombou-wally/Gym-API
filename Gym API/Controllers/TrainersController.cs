@@ -1,5 +1,6 @@
 ﻿using Gym_API.Data;
 using Gym_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -9,6 +10,7 @@ namespace Gym_API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class TrainersController : ControllerBase
     {
         private readonly GymContext _context;
@@ -32,6 +34,7 @@ namespace Gym_API.Controllers
             return Ok(trainer);
         }
         [HttpPost]
+        [Authorize(Roles = Roles.Admin)]
         public async Task<ActionResult<Trainer>> PostTrainer(Trainer trainer)
         {
             _context.Trainers.Add(trainer);

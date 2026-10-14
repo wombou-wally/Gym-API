@@ -1,6 +1,7 @@
 ﻿using Gym_API.Data;
 using Gym_API.DTOs;
 using Gym_API.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,6 +9,7 @@ namespace Gym_API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class CheckInsController : ControllerBase
     {
         private readonly GymContext  _context;
