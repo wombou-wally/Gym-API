@@ -1,0 +1,134 @@
+﻿@page "/plans"
+@inject GymApiClient Api
+@inject AuthState Auth
+@inject ToastService Toast
+
+<PageTitle>Plans</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Plans</h1>
+        <p class="page-sub">What members can sign up for.</p>
+    </div>
+    @if (Auth.IsAdmin)
+    {
+        <button class="btn-grad" @onclick="() => showForm = !showForm">
+            <i class="bi bi-plus-lg"></i> New plan
+        </button>
+    }
+</div>
+
+@if (showForm && Auth.IsAdmin)
+{
+    <div class="panel form-panel mb-4">
+        <div class="form-grid">
+            <div>
+                <label>Name</label>
+                <input class="form-control" @bind="newPlan.Name" @bind:event="oninput" />
+            </div>
+            <div>
+                <label>Price</label>
+                <input type="number" step="0.01" class="form-control" @bind="newPlan.Price" />
+            </div>
+            <div>
+                <label>Duration (days)</label>
+                <input type="number" class="form-control" @bind="newPlan.DurationDays" />
+            </div>
+        </div>
+        <button class="btn-grad" @onclick="SavePlan" disabled="@saving">
+            <i class="bi bi-check-lg"></i> @(saving ? "Saving..." : "Save plan")
+        </button>
+    </div>
+}
+
+@if (plans == null)
+{
+    <div class="loader"><div class="loader-ring"></div></div>
+}
+else if (plans.Count == 0)
+{
+    <div class="panel"><p class="empty">No plans yet.</p></div>
+}
+else
+{
+    <div class="plan-grid">
+        @for (int i = 0; i < plans.Count; i++)
+        {
+            var p = plans[i];
+            <div class="plan-card" style="--i:@i" @key="p.Id">
+                <div class="plan-name">@p.Name</div>
+                <div class="plan-price">@p.Price.ToString("C")</div>
+                <div class="plan-duration"><i class="bi bi-calendar3"></i> @p.DurationDays days</div>
+
+                @if (Auth.IsAdmin)
+                {
+                    @if (confirmingId == p.Id)
+                    {
+                        <div class="actions">
+                            <span class="confirm-text">Delete?</span>
+                            <button class="btn-soft danger" @onclick="() => DeletePlan(p)">Yes</button>
+                            <button class="btn-soft" @onclick="() => confirmingId = null">No</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <button class="btn-soft danger" @onclick="() => confirmingId = p.Id">
+                            <i class="bi bi-trash3"></i> Delete
+                        </button>
+                    }
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<PlanResponse>? plans;
+    private CreatePlanRequest newPlan = new();
+    private bool showForm;
+    private bool saving;
+    private int? confirmingId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        var result = await Api.GetPlansAsync(Auth.Token!);
+        if (!Toast.Failed(result))
+        {
+            plans = result.Data ?? [];
+        }
+        else
+        {
+            plans ??= [];
+        }
+    }
+
+    private async Task SavePlan()
+    {
+        saving = true;
+        var result = await Api.CreatePlanAsync(Auth.Token!, newPlan);
+        saving = false;
+
+        if (Toast.Report(result, $"{newPlan.Name} created."))
+        {
+            newPlan = new CreatePlanRequest();
+            showForm = false;
+            await Load();
+        }
+    }
+
+    private async Task DeletePlan(PlanResponse p)
+    {
+        var result = await Api.DeletePlanAsync(Auth.Token!, p.Id);
+        confirmingId = null;
+
+        if (Toast.Report(result, $"{p.Name} deleted."))
+        {
+            await Load();
+        }
+    }
+}

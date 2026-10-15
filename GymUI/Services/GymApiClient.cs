@@ -8,6 +8,7 @@ namespace GymUI.Services
 {
     public class GymApiClient
     {
+        private const string ServerDown = "Cannot reach the server. Is the API running?";
         private readonly HttpClient _httpClient;
 
         public GymApiClient(HttpClient httpClient)
@@ -15,6 +16,72 @@ namespace GymUI.Services
             _httpClient = httpClient;
         }
 
+        // ---------- auth ----------
+        public async Task<ApiResult<LoginResponse>> LoginAsync(string email, string password)
+        {
+            try
+            {
+                var body = new LoginRequest { Email = email, Password = password };
+                using var response = await _httpClient.PostAsJsonAsync("api/auth/login", body);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    return new ApiResult<LoginResponse>
+                    {
+                        Success = true,
+                        Data = await response.Content.ReadFromJsonAsync<LoginResponse>()
+                    };
+                }
+                if (response.StatusCode == HttpStatusCode.Unauthorized)
+                {
+                    return new ApiResult<LoginResponse> { Error = "Invalid email or password." };
+                }
+
+                var text = await response.Content.ReadAsStringAsync();
+                return new ApiResult<LoginResponse> { Error = ReadError(text) };
+            }
+            catch (HttpRequestException)
+            {
+                return new ApiResult<LoginResponse> { Error = ServerDown };
+            }
+        }
+
+        // ---------- reads ----------
+        public Task<ApiResult<List<MemberResponse>>> GetMembersAsync(string token) =>
+            GetAsync<List<MemberResponse>>("api/members", token);
+
+        public Task<ApiResult<List<PlanResponse>>> GetPlansAsync(string token) =>
+            GetAsync<List<PlanResponse>>("api/plans", token);
+
+        public Task<ApiResult<List<TrainerResponse>>> GetTrainersAsync(string token) =>
+            GetAsync<List<TrainerResponse>>("api/trainers", token);
+
+        public Task<ApiResult<List<CheckInResponse>>> GetCheckInsAsync(string token) =>
+            GetAsync<List<CheckInResponse>>("api/checkins", token);
+
+        // ---------- writes ----------
+        public Task<ApiResult> CreateMemberAsync(string token, CreateMemberRequest member) =>
+            SendAsync(HttpMethod.Post, "api/members", token, member);
+
+        public Task<ApiResult> CreatePlanAsync(string token, CreatePlanRequest plan) =>
+            SendAsync(HttpMethod.Post, "api/plans", token, plan);
+
+        public Task<ApiResult> CreateTrainerAsync(string token, CreateTrainerRequest trainer) =>
+            SendAsync(HttpMethod.Post, "api/trainers", token, trainer);
+
+        public Task<ApiResult> CheckInAsync(string token, int memberId) =>
+            SendAsync(HttpMethod.Post, "api/checkins", token, new CreateCheckInRequest { MemberId = memberId });
+
+        public Task<ApiResult> RenewAsync(string token, int memberId) =>
+            SendAsync(HttpMethod.Post, $"api/members/{memberId}/renew", token);
+
+        public Task<ApiResult> DeleteMemberAsync(string token, int memberId) =>
+            SendAsync(HttpMethod.Delete, $"api/members/{memberId}", token);
+
+        public Task<ApiResult> DeletePlanAsync(string token, int planId) =>
+            SendAsync(HttpMethod.Delete, $"api/plans/{planId}", token);
+
+        // ---------- helpers ----------
         private static HttpRequestMessage BuildRequest(HttpMethod method, string url, string token)
         {
             var request = new HttpRequestMessage(method, url);
@@ -22,71 +89,71 @@ namespace GymUI.Services
             return request;
         }
 
-        public async Task<LoginResponse?> LoginAsync(string email, string password)
+        private async Task<ApiResult<T>> GetAsync<T>(string url, string token)
         {
-            var request = new LoginRequest
+            try
             {
-                Email = email,
-                Password = password
-            };
+                using var request = BuildRequest(HttpMethod.Get, url, token);
+                using var response = await _httpClient.SendAsync(request);
 
-            var response = await _httpClient.PostAsJsonAsync("api/auth/login", request);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
+                if (!response.IsSuccessStatusCode)
+                {
+                    var failure = await FailureAsync(response);
+                    return new ApiResult<T> { Error = failure.Error, SessionExpired = failure.SessionExpired };
+                }
+
+                return new ApiResult<T>
+                {
+                    Success = true,
+                    Data = await response.Content.ReadFromJsonAsync<T>()
+                };
             }
-
-            return await response.Content.ReadFromJsonAsync<LoginResponse>();
+            catch (HttpRequestException)
+            {
+                return new ApiResult<T> { Error = ServerDown };
+            }
         }
 
-        public async Task<List<MemberResponse>?> GetMembersAsync(string token)
+        private async Task<ApiResult> SendAsync(HttpMethod method, string url, string token, object? body = null)
         {
-            using var request = BuildRequest(HttpMethod.Get, "api/members", token);
-
-            var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
+            try
             {
-                return null;
-            }
+                using var request = BuildRequest(method, url, token);
+                if (body != null)
+                {
+                    request.Content = JsonContent.Create(body);
+                }
 
-            return await response.Content.ReadFromJsonAsync<List<MemberResponse>>();
+                using var response = await _httpClient.SendAsync(request);
+                if (response.IsSuccessStatusCode)
+                {
+                    return new ApiResult { Success = true };
+                }
+                return await FailureAsync(response);
+            }
+            catch (HttpRequestException)
+            {
+                return new ApiResult { Error = ServerDown };
+            }
         }
 
-        public async Task<List<PlanResponse>?> GetPlansAsync(string token)
+        private static async Task<ApiResult> FailureAsync(HttpResponseMessage response)
         {
-            using var request = BuildRequest(HttpMethod.Get, "api/plans", token);
-
-            var response = await _httpClient.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-
-            return await response.Content.ReadFromJsonAsync<List<PlanResponse>>();
-        }
-
-        public async Task<ApiResult> CreateMemberAsync(string token, CreateMemberRequest member)
-        {
-            using var request = BuildRequest(HttpMethod.Post, "api/members", token);
-            request.Content = JsonContent.Create(member);
-
-            var response = await _httpClient.SendAsync(request);
-            if (response.IsSuccessStatusCode)
-            {
-                return new ApiResult { Success = true };
-            }
-
             if (response.StatusCode == HttpStatusCode.Unauthorized)
             {
-                return new ApiResult { Error = "Your session expired. Please log in again." };
+                return new ApiResult { Error = "Your session expired. Please sign in again.", SessionExpired = true };
             }
             if (response.StatusCode == HttpStatusCode.Forbidden)
             {
                 return new ApiResult { Error = "You do not have permission to do that." };
             }
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return new ApiResult { Error = "That item no longer exists." };
+            }
 
-            var body = await response.Content.ReadAsStringAsync();
-            return new ApiResult { Error = ReadError(body) };
+            var text = await response.Content.ReadAsStringAsync();
+            return new ApiResult { Error = ReadError(text) };
         }
 
         private static string ReadError(string body)
@@ -101,7 +168,7 @@ namespace GymUI.Services
             }
             catch (JsonException)
             {
-                // The body was plain text, not JSON. Fall through and show it as is.
+                // Plain-text 400 from a controller. Show it as is.
             }
 
             return string.IsNullOrWhiteSpace(body) ? "The request failed." : body;

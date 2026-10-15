@@ -1,0 +1,106 @@
+﻿@page "/checkins"
+@inject GymApiClient Api
+@inject AuthState Auth
+@inject ToastService Toast
+
+<PageTitle>Check-ins</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Check-ins</h1>
+        <p class="page-sub">Log a visit and see who came in recently.</p>
+    </div>
+</div>
+
+@if (loading)
+{
+    <div class="loader"><div class="loader-ring"></div></div>
+}
+else
+{
+    <div class="two-col narrow-left">
+        <div class="panel form-panel" style="--i:0">
+            <h2 class="panel-title mb-3">New check-in</h2>
+            <label>Member</label>
+            <select class="form-select" @bind="selectedMemberId">
+                <option value="0">Choose a member...</option>
+                @foreach (var m in members)
+                {
+                    <option value="@m.Id">@m.Name</option>
+                }
+            </select>
+            <button class="btn-grad mt-3" @onclick="DoCheckIn" disabled="@(selectedMemberId == 0 || busy)">
+                <i class="bi bi-check2-square"></i> @(busy ? "Saving..." : "Check in")
+            </button>
+        </div>
+
+        <div class="panel" style="--i:1">
+            <div class="panel-head"><h2>History</h2></div>
+            @if (checkIns.Count == 0)
+            {
+                <p class="empty">No check-ins yet.</p>
+            }
+            else
+            {
+                <ul class="timeline">
+                    @foreach (var c in History)
+                    {
+                        <li class="timeline-item" @key="c.Id">
+                            <span class="avatar sm">@UiHelpers.Initials(NameOf(c.MemberId))</span>
+                            <div>
+                                <strong>@NameOf(c.MemberId)</strong>
+                                <small>@c.CheckInTime.ToLocalTime().ToString("dddd, MMM d · h:mm tt")</small>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<MemberResponse> members = [];
+    private List<CheckInResponse> checkIns = [];
+    private int selectedMemberId;
+    private bool loading = true;
+    private bool busy;
+
+    private IEnumerable<CheckInResponse> History => checkIns.OrderByDescending(c => c.CheckInTime).Take(50);
+
+    private string NameOf(int memberId) =>
+        members.FirstOrDefault(m => m.Id == memberId)?.Name ?? $"Member #{memberId}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = Auth.Token!;
+        var membersTask = Api.GetMembersAsync(token);
+        var checkInsTask = Api.GetCheckInsAsync(token);
+        await Task.WhenAll(membersTask, checkInsTask);
+
+        var membersResult = await membersTask;
+        var checkInsResult = await checkInsTask;
+
+        if (!Toast.Failed(membersResult)) members = membersResult.Data ?? [];
+        if (!Toast.Failed(checkInsResult)) checkIns = checkInsResult.Data ?? [];
+
+        loading = false;
+    }
+
+    private async Task DoCheckIn()
+    {
+        busy = true;
+        var result = await Api.CheckInAsync(Auth.Token!, selectedMemberId);
+        busy = false;
+
+        if (Toast.Report(result, $"{NameOf(selectedMemberId)} checked in."))
+        {
+            selectedMemberId = 0;
+            var refreshed = await Api.GetCheckInsAsync(Auth.Token!);
+            if (!Toast.Failed(refreshed))
+            {
+                checkIns = refreshed.Data ?? [];
+            }
+        }
+    }
+}

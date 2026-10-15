@@ -1,56 +1,53 @@
 ﻿@page "/members/add"
 @inject GymApiClient Api
 @inject AuthState Auth
+@inject ToastService Toast
 @inject NavigationManager Nav
 
 <PageTitle>Add member</PageTitle>
 
-<h1>Add member</h1>
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Add member</h1>
+        <p class="page-sub">Register a new person at the front desk.</p>
+    </div>
+    <a class="btn-soft" href="/members"><i class="bi bi-arrow-left"></i> Back</a>
+</div>
 
-@if (!Auth.IsLoggedIn)
-{
-    <p>Please log in. <a href="/login">Click here to log in</a></p>
-}
-else
-{
-    <div class="mb-3">
-        <label class="form-label">Name</label>
-        <input class="form-control" @bind="newMember.Name" @bind:event="oninput" />
+<div class="panel form-panel">
+    <div class="form-grid">
+        <div>
+            <label>Name</label>
+            <input class="form-control" @bind="newMember.Name" @bind:event="oninput" />
+        </div>
+        <div>
+            <label>Email</label>
+            <input class="form-control" @bind="newMember.Email" @bind:event="oninput" />
+        </div>
+        <div>
+            <label>Phone (optional)</label>
+            <input class="form-control" @bind="newMember.Phone" @bind:event="oninput" />
+        </div>
+        <div>
+            <label>Join date</label>
+            <input type="date" class="form-control" @bind="newMember.JoinDate" />
+        </div>
+        <div>
+            <label>Plan</label>
+            <select class="form-select" @bind="selectedPlanId">
+                <option value="">No plan yet</option>
+                @foreach (var plan in plans)
+                {
+                    <option value="@plan.Id">@plan.Name (@plan.Price.ToString("C"))</option>
+                }
+            </select>
+        </div>
     </div>
 
-    <div class="mb-3">
-        <label class="form-label">Email</label>
-        <input class="form-control" @bind="newMember.Email" @bind:event="oninput" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Phone (optional)</label>
-        <input class="form-control" @bind="newMember.Phone" @bind:event="oninput" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Join date</label>
-        <input type="date" class="form-control" @bind="newMember.JoinDate" />
-    </div>
-
-    <div class="mb-3">
-        <label class="form-label">Plan</label>
-        <select class="form-select" @bind="selectedPlanId">
-            <option value="">No plan</option>
-            @foreach (var plan in plans)
-            {
-                <option value="@plan.Id">@plan.Name (@plan.Price.ToString("C"))</option>
-            }
-        </select>
-    </div>
-
-    <button class="btn btn-primary" @onclick="Save" disabled="@saving">Save</button>
-
-    @if (error != null)
-    {
-        <p class="text-danger mt-3">@error</p>
-    }
-}
+    <button class="btn-grad" @onclick="Save" disabled="@saving">
+        <i class="bi bi-check-lg"></i> @(saving ? "Saving..." : "Save member")
+    </button>
+</div>
 
 @code {
     private CreateMemberRequest newMember = new()
@@ -59,20 +56,19 @@ else
     };
     private List<PlanResponse> plans = [];
     private int? selectedPlanId;
-    private string? error;
     private bool saving;
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsLoggedIn)
+        var result = await Api.GetPlansAsync(Auth.Token!);
+        if (!Toast.Failed(result))
         {
-            plans = await Api.GetPlansAsync(Auth.Token!) ?? [];
+            plans = result.Data ?? [];
         }
     }
 
     private async Task Save()
     {
-        error = null;
         saving = true;
 
         newMember.MembershipPlanId = selectedPlanId;
@@ -84,13 +80,9 @@ else
         var result = await Api.CreateMemberAsync(Auth.Token!, newMember);
         saving = false;
 
-        if (result.Success)
+        if (Toast.Report(result, $"{newMember.Name} added."))
         {
             Nav.NavigateTo("/members");
-        }
-        else
-        {
-            error = result.Error;
         }
     }
 }

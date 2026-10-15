@@ -1,98 +1,191 @@
 ﻿@page "/members"
 @inject GymApiClient Api
 @inject AuthState Auth
+@inject ToastService Toast
 
 <PageTitle>Members</PageTitle>
 
-@if (!Auth.IsLoggedIn)
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Members</h1>
+        <p class="page-sub">@(members?.Count ?? 0) people in your gym</p>
+    </div>
+    <a class="btn-grad" href="/members/add"><i class="bi bi-person-plus-fill"></i> Add member</a>
+</div>
+
+@if (loadFailed)
 {
-    <div class="alert alert-info">
-        Please log in. <a href="/login">Click here to log in</a>
+    <div class="panel">
+        <p class="empty">Could not load members.</p>
+        <p class="empty"><button class="btn-soft primary" @onclick="Load">Try again</button></p>
     </div>
 }
-else if (error != null)
+else if (members == null)
 {
-    <div class="alert alert-danger">@error</div>
-}
-else if (memberslist == null)
-{
-    <div class="spinner-border" role="status"></div>
+    <div class="loader"><div class="loader-ring"></div></div>
 }
 else
 {
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <span>Members</span>
-            <a class="btn btn-primary btn-sm" href="/members/add">Add member</a>
+    var rows = Filtered;
+    <div class="panel">
+        <div class="panel-head">
+            <div class="search">
+                <i class="bi bi-search"></i>
+                <input placeholder="Search by name or email..." @bind="search" @bind:event="oninput" />
+            </div>
         </div>
-        <div class="card-body p-0">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
-                    <tr>
-                        <th>#</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Joined</th>
-                        <th>Status</th>
-                        <th>Plan</th>
-                        <th>Trainers</th>
-                        <th>Expires</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @for (int i = 0; i < memberslist.Count; i++)
-                    {
-                        var m = memberslist[i];
+
+        @if (rows.Count == 0)
+        {
+            <p class="empty">No members match your search.</p>
+        }
+        else
+        {
+            <div class="table-wrap">
+                <table class="data-table">
+                    <thead>
                         <tr>
-                            <td>@(i + 1)</td>
-                            <td>@m.Name</td>
-                            <td>@m.Email</td>
-                            <td>@m.Phone</td>
-                            <td>@m.JoinDate.ToString("yyyy-MM-dd")</td>
-                            <td>
-                                @if (m.IsActive)
-                                {
-                                    <span class="badge bg-success">Active</span>
-                                }
-                                else
-                                {
-                                    <span class="badge bg-secondary">Inactive</span>
-                                }
-                            </td>
-                            <td>
-                                @if (m.Plan == null)
-                                {
-                                    <span class="text-muted">No plan</span>
-                                }
-                                else
-                                {
-                                    @m.Plan.Name
-                                }
-                            </td>
-                            <td>@string.Join(", ", m.Trainers.Select(t => t.Name))</td>
-                            <td>@(m.ExpiryDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                            <th>Member</th>
+                            <th>Plan</th>
+                            <th>Trainers</th>
+                            <th>Status</th>
+                            <th>Expires</th>
+                            <th>Actions</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
-        </div>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < rows.Count; i++)
+                        {
+                            var m = rows[i];
+                            var (statusText, statusCss) = UiHelpers.Status(m.ExpiryDate);
+                            <tr style="--i:@i" @key="m.Id">
+                                <td>
+                                    <div class="who">
+                                        <span class="avatar">@UiHelpers.Initials(m.Name)</span>
+                                        <div>
+                                            <div class="who-name">@m.Name</div>
+                                            <div class="who-sub">@m.Email</div>
+                                            @if (!string.IsNullOrWhiteSpace(m.Phone))
+                                            {
+                                                <div class="who-sub">@m.Phone</div>
+                                            }
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    @if (m.Plan == null)
+                                    {
+                                        <span class="muted">No plan</span>
+                                    }
+                                    else
+                                    {
+                                        <strong>@m.Plan.Name</strong>
+                                    }
+                                </td>
+                                <td>
+                                    @if (m.Trainers.Count == 0)
+                                    {
+                                        <span class="muted">-</span>
+                                    }
+                                    else
+                                    {
+                                        @string.Join(", ", m.Trainers.Select(t => t.Name))
+                                    }
+                                </td>
+                                <td><span class="pill @statusCss">@statusText</span></td>
+                                <td>@(m.ExpiryDate?.ToString("MMM d, yyyy") ?? "-")</td>
+                                <td>
+                                    <div class="actions">
+                                        @if (confirmingId == m.Id)
+                                        {
+                                            <span class="confirm-text">Delete?</span>
+                                            <button class="btn-soft danger" @onclick="() => DeleteMember(m)">Yes</button>
+                                            <button class="btn-soft" @onclick="() => confirmingId = null">No</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn-soft success" @onclick="() => CheckIn(m)" disabled="@(busyId == m.Id)">
+                                                <i class="bi bi-box-arrow-in-right"></i> Check in
+                                            </button>
+                                            <button class="btn-soft primary" @onclick="() => Renew(m)" disabled="@(busyId == m.Id)">
+                                                <i class="bi bi-arrow-repeat"></i> Renew
+                                            </button>
+                                            @if (Auth.IsAdmin)
+                                            {
+                                                <button class="btn-soft danger" @onclick="() => confirmingId = m.Id" title="Delete">
+                                                    <i class="bi bi-trash3"></i>
+                                                </button>
+                                            }
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
     </div>
 }
 
 @code {
-    private List<MemberResponse>? memberslist;
-    private string? error;
+    private List<MemberResponse>? members;
+    private bool loadFailed;
+    private string search = "";
+    private int? busyId;
+    private int? confirmingId;
+
+    private List<MemberResponse> Filtered => members == null
+        ? []
+        : members.Where(m =>
+            m.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+            m.Email.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
 
     protected override async Task OnInitializedAsync()
     {
-        if (Auth.IsLoggedIn)
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        loadFailed = false;
+        var result = await Api.GetMembersAsync(Auth.Token!);
+        if (Toast.Failed(result))
         {
-            memberslist = await Api.GetMembersAsync(Auth.Token!);
-            if (memberslist == null)
-            {
-                error = "Could not load members. Your session may have expired. Please log in again.";
-            }
+            loadFailed = true;
+            return;
+        }
+        members = result.Data ?? [];
+    }
+
+    private async Task CheckIn(MemberResponse m)
+    {
+        busyId = m.Id;
+        var result = await Api.CheckInAsync(Auth.Token!, m.Id);
+        busyId = null;
+        Toast.Report(result, $"{m.Name} checked in.");
+    }
+
+    private async Task Renew(MemberResponse m)
+    {
+        busyId = m.Id;
+        var result = await Api.RenewAsync(Auth.Token!, m.Id);
+        busyId = null;
+        if (Toast.Report(result, $"{m.Name} renewed."))
+        {
+            await Load();
+        }
+    }
+
+    private async Task DeleteMember(MemberResponse m)
+    {
+        busyId = m.Id;
+        var result = await Api.DeleteMemberAsync(Auth.Token!, m.Id);
+        busyId = null;
+        confirmingId = null;
+        if (Toast.Report(result, $"{m.Name} deleted."))
+        {
+            await Load();
         }
     }
 }

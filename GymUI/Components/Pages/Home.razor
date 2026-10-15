@@ -1,7 +1,146 @@
 ﻿@page "/"
+@inject GymApiClient Api
+@inject AuthState Auth
+@inject ToastService Toast
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard</PageTitle>
 
-<h1>Hello, world!</h1>
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Dashboard</h1>
+        <p class="page-sub">@today.ToString("dddd, MMMM d, yyyy")</p>
+    </div>
+    <a class="btn-grad" href="/members/add"><i class="bi bi-person-plus-fill"></i> Add member</a>
+</div>
 
-Welcome to your new app.
+@if (loading)
+{
+    <div class="loader"><div class="loader-ring"></div></div>
+}
+else
+{
+    var cards = Cards;
+    <div class="stats">
+        @for (int i = 0; i < cards.Count; i++)
+        {
+            var card = cards[i];
+            <div class="stat" style="--i:@i">
+                <div class="stat-icon @card.Color"><i class="bi @card.Icon"></i></div>
+                <div>
+                    <div class="count" style="--target:@card.Value" title="@card.Value"></div>
+                    <div class="stat-label">@card.Label</div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="two-col">
+        <div class="panel" style="--i:6">
+            <div class="panel-head">
+                <h2>Recent check-ins</h2>
+                <a href="/checkins">View all</a>
+            </div>
+            @if (checkIns.Count == 0)
+            {
+                <p class="empty">No check-ins yet.</p>
+            }
+            else
+            {
+                <ul class="timeline">
+                    @foreach (var c in RecentCheckIns)
+                    {
+                        <li class="timeline-item" @key="c.Id">
+                            <span class="avatar sm">@UiHelpers.Initials(NameOf(c.MemberId))</span>
+                            <div>
+                                <strong>@NameOf(c.MemberId)</strong>
+                                <small>@c.CheckInTime.ToLocalTime().ToString("MMM d, h:mm tt")</small>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="panel" style="--i:7">
+            <div class="panel-head">
+                <h2>Expiring this week</h2>
+                <a href="/members">Members</a>
+            </div>
+            @if (!ExpiringMembers.Any())
+            {
+                <p class="empty">Nobody expires in the next 7 days.</p>
+            }
+            else
+            {
+                <ul class="timeline">
+                    @foreach (var m in ExpiringMembers)
+                    {
+                        <li class="timeline-item" @key="m.Id">
+                            <span class="avatar sm">@UiHelpers.Initials(m.Name)</span>
+                            <div>
+                                <strong>@m.Name</strong>
+                                <small>@(m.ExpiryDate!.Value.DayNumber - today.DayNumber) days left · @m.ExpiryDate.Value.ToString("MMM d")</small>
+                            </div>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private List<MemberResponse> members = [];
+    private List<PlanResponse> plans = [];
+    private List<TrainerResponse> trainers = [];
+    private List<CheckInResponse> checkIns = [];
+    private bool loading = true;
+    private readonly DateOnly today = DateOnly.FromDateTime(DateTime.Today);
+
+    private int ActiveCount => members.Count(m => m.ExpiryDate != null && m.ExpiryDate.Value >= today);
+
+    private IEnumerable<MemberResponse> ExpiringMembers => members
+        .Where(m => m.ExpiryDate != null && m.ExpiryDate.Value >= today && m.ExpiryDate.Value <= today.AddDays(7))
+        .OrderBy(m => m.ExpiryDate)
+        .Take(6);
+
+    private int TodayCheckIns => checkIns.Count(c => DateOnly.FromDateTime(c.CheckInTime.ToLocalTime()) == today);
+
+    private IEnumerable<CheckInResponse> RecentCheckIns => checkIns.OrderByDescending(c => c.CheckInTime).Take(6);
+
+    private List<(string Label, int Value, string Icon, string Color)> Cards => new()
+    {
+        ("Members", members.Count, "bi-people-fill", "teal"),
+        ("Active", ActiveCount, "bi-lightning-charge-fill", "green"),
+        ("Expiring in 7 days", ExpiringMembers.Count(), "bi-hourglass-split", "amber"),
+        ("Check-ins today", TodayCheckIns, "bi-check2-square", "blue"),
+        ("Plans", plans.Count, "bi-award-fill", "violet"),
+        ("Trainers", trainers.Count, "bi-person-badge-fill", "rose"),
+    };
+
+    private string NameOf(int memberId) =>
+        members.FirstOrDefault(m => m.Id == memberId)?.Name ?? $"Member #{memberId}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var token = Auth.Token!;
+        var membersTask = Api.GetMembersAsync(token);
+        var plansTask = Api.GetPlansAsync(token);
+        var trainersTask = Api.GetTrainersAsync(token);
+        var checkInsTask = Api.GetCheckInsAsync(token);
+
+        await Task.WhenAll(membersTask, plansTask, trainersTask, checkInsTask);
+
+        var membersResult = await membersTask;
+        var plansResult = await plansTask;
+        var trainersResult = await trainersTask;
+        var checkInsResult = await checkInsTask;
+
+        if (!Toast.Failed(membersResult)) members = membersResult.Data ?? [];
+        if (!Toast.Failed(plansResult)) plans = plansResult.Data ?? [];
+        if (!Toast.Failed(trainersResult)) trainers = trainersResult.Data ?? [];
+        if (!Toast.Failed(checkInsResult)) checkIns = checkInsResult.Data ?? [];
+
+        loading = false;
+    }
+}

@@ -1,23 +1,114 @@
 ﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject AuthState Auth
+@inject ToastService Toast
+@inject NavigationManager Nav
 
-<div class="page">
-    <div class="sidebar">
-        <NavMenu />
-    </div>
+@if (Auth.IsLoggedIn)
+{
+    <button class="menu-toggle" @onclick="ToggleMenu" aria-label="Menu"><i class="bi bi-list"></i></button>
+    <div class="scrim @(menuOpen ? "show" : "")" @onclick="CloseMenu"></div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+    <aside class="sidebar @(menuOpen ? "open" : "")">
+        <div class="brand">
+            <span class="brand-logo"><i class="bi bi-lightning-charge-fill"></i></span>
+            <span class="brand-name">Gym<span>Manager</span></span>
         </div>
 
-        <article class="content px-4">
+        <nav class="side-nav" @onclick="CloseMenu">
+            <NavLink class="side-link" href="" Match="NavLinkMatch.All">
+                <i class="bi bi-speedometer2"></i><span>Dashboard</span>
+            </NavLink>
+            <NavLink class="side-link" href="members">
+                <i class="bi bi-people-fill"></i><span>Members</span>
+            </NavLink>
+            <NavLink class="side-link" href="checkins">
+                <i class="bi bi-check2-square"></i><span>Check-ins</span>
+            </NavLink>
+            <NavLink class="side-link" href="plans">
+                <i class="bi bi-award-fill"></i><span>Plans</span>
+            </NavLink>
+            <NavLink class="side-link" href="trainers">
+                <i class="bi bi-person-badge-fill"></i><span>Trainers</span>
+            </NavLink>
+        </nav>
+
+        <div class="side-footer">
+            <div class="user-chip">
+                <span class="avatar sm">@UiHelpers.Initials(Auth.Role)</span>
+                <div>
+                    <small>Signed in as</small>
+                    <strong>@Auth.Role</strong>
+                </div>
+            </div>
+            <button class="logout-btn" @onclick="Logout" title="Log out"><i class="bi bi-box-arrow-right"></i></button>
+        </div>
+    </aside>
+
+    <main class="content">
+        <div class="page-fade" @key="Nav.Uri">
             @Body
-        </article>
+        </div>
     </main>
-</div>
+
+    @if (Toast.Text != null)
+    {
+        <div class="toast-msg @(Toast.IsError ? "bad" : "ok")" @key="Toast.Id">
+            <i class="bi @(Toast.IsError ? "bi-x-circle-fill" : "bi-check-circle-fill")"></i>
+            @Toast.Text
+        </div>
+    }
+}
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool menuOpen;
+
+    protected override void OnInitialized()
+    {
+        Toast.Clear();
+        Auth.OnChange += HandleAuthChange;
+        Toast.OnChange += HandleToastChange;
+    }
+
+    // Runs on every navigation: nobody gets past here without logging in.
+    protected override void OnParametersSet()
+    {
+        if (!Auth.IsLoggedIn)
+        {
+            Nav.NavigateTo("/login");
+        }
+    }
+
+    private void HandleAuthChange()
+    {
+        InvokeAsync(() =>
+        {
+            if (!Auth.IsLoggedIn)
+            {
+                Nav.NavigateTo("/login");
+            }
+            StateHasChanged();
+        });
+    }
+
+    private void HandleToastChange()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMenu() => menuOpen = !menuOpen;
+    private void CloseMenu() => menuOpen = false;
+    private void Logout() => Auth.SignOut();
+
+    public void Dispose()
+    {
+        Auth.OnChange -= HandleAuthChange;
+        Toast.OnChange -= HandleToastChange;
+    }
+}

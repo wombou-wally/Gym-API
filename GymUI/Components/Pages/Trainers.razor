@@ -1,0 +1,124 @@
+﻿@page "/trainers"
+@inject GymApiClient Api
+@inject AuthState Auth
+@inject ToastService Toast
+
+<PageTitle>Trainers</PageTitle>
+
+<div class="page-head">
+    <div>
+        <h1 class="page-title">Trainers</h1>
+        <p class="page-sub">The people who keep everyone moving.</p>
+    </div>
+    @if (Auth.IsAdmin)
+    {
+        <button class="btn-grad" @onclick="() => showForm = !showForm">
+            <i class="bi bi-plus-lg"></i> New trainer
+        </button>
+    }
+</div>
+
+@if (showForm && Auth.IsAdmin)
+{
+    <div class="panel form-panel mb-4">
+        <div class="form-grid">
+            <div>
+                <label>Name</label>
+                <input class="form-control" @bind="newTrainer.Name" @bind:event="oninput" />
+            </div>
+            <div>
+                <label>Email</label>
+                <input class="form-control" @bind="newTrainer.Email" @bind:event="oninput" />
+            </div>
+            <div>
+                <label>Phone (optional)</label>
+                <input class="form-control" @bind="newTrainer.Phone" @bind:event="oninput" />
+            </div>
+            <div>
+                <label>Speciality (optional)</label>
+                <input class="form-control" @bind="newTrainer.Speciality" @bind:event="oninput" />
+            </div>
+        </div>
+        <button class="btn-grad" @onclick="SaveTrainer" disabled="@saving">
+            <i class="bi bi-check-lg"></i> @(saving ? "Saving..." : "Save trainer")
+        </button>
+    </div>
+}
+
+@if (trainers == null)
+{
+    <div class="loader"><div class="loader-ring"></div></div>
+}
+else if (trainers.Count == 0)
+{
+    <div class="panel"><p class="empty">No trainers yet.</p></div>
+}
+else
+{
+    <div class="trainer-grid">
+        @for (int i = 0; i < trainers.Count; i++)
+        {
+            var t = trainers[i];
+            <div class="trainer-card" style="--i:@i" @key="t.Id">
+                <div class="trainer-top">
+                    <span class="avatar lg">@UiHelpers.Initials(t.Name)</span>
+                    <div>
+                        <h3>@t.Name</h3>
+                        @if (!string.IsNullOrWhiteSpace(t.Speciality))
+                        {
+                            <span class="chip">@t.Speciality</span>
+                        }
+                    </div>
+                </div>
+                <div class="contact-line"><i class="bi bi-envelope"></i>@t.Email</div>
+                @if (!string.IsNullOrWhiteSpace(t.Phone))
+                {
+                    <div class="contact-line"><i class="bi bi-telephone"></i>@t.Phone</div>
+                }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<TrainerResponse>? trainers;
+    private CreateTrainerRequest newTrainer = new();
+    private bool showForm;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Load();
+    }
+
+    private async Task Load()
+    {
+        var result = await Api.GetTrainersAsync(Auth.Token!);
+        if (!Toast.Failed(result))
+        {
+            trainers = result.Data ?? [];
+        }
+        else
+        {
+            trainers ??= [];
+        }
+    }
+
+    private async Task SaveTrainer()
+    {
+        saving = true;
+
+        if (string.IsNullOrWhiteSpace(newTrainer.Phone)) newTrainer.Phone = null;
+        if (string.IsNullOrWhiteSpace(newTrainer.Speciality)) newTrainer.Speciality = null;
+
+        var result = await Api.CreateTrainerAsync(Auth.Token!, newTrainer);
+        saving = false;
+
+        if (Toast.Report(result, $"{newTrainer.Name} added."))
+        {
+            newTrainer = new CreateTrainerRequest();
+            showForm = false;
+            await Load();
+        }
+    }
+}
