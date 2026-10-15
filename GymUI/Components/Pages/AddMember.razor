@@ -1,0 +1,96 @@
+﻿@page "/members/add"
+@inject GymApiClient Api
+@inject AuthState Auth
+@inject NavigationManager Nav
+
+<PageTitle>Add member</PageTitle>
+
+<h1>Add member</h1>
+
+@if (!Auth.IsLoggedIn)
+{
+    <p>Please log in. <a href="/login">Click here to log in</a></p>
+}
+else
+{
+    <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input class="form-control" @bind="newMember.Name" @bind:event="oninput" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Email</label>
+        <input class="form-control" @bind="newMember.Email" @bind:event="oninput" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Phone (optional)</label>
+        <input class="form-control" @bind="newMember.Phone" @bind:event="oninput" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Join date</label>
+        <input type="date" class="form-control" @bind="newMember.JoinDate" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Plan</label>
+        <select class="form-select" @bind="selectedPlanId">
+            <option value="">No plan</option>
+            @foreach (var plan in plans)
+            {
+                <option value="@plan.Id">@plan.Name (@plan.Price.ToString("C"))</option>
+            }
+        </select>
+    </div>
+
+    <button class="btn btn-primary" @onclick="Save" disabled="@saving">Save</button>
+
+    @if (error != null)
+    {
+        <p class="text-danger mt-3">@error</p>
+    }
+}
+
+@code {
+    private CreateMemberRequest newMember = new()
+    {
+        JoinDate = DateOnly.FromDateTime(DateTime.Today)
+    };
+    private List<PlanResponse> plans = [];
+    private int? selectedPlanId;
+    private string? error;
+    private bool saving;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsLoggedIn)
+        {
+            plans = await Api.GetPlansAsync(Auth.Token!) ?? [];
+        }
+    }
+
+    private async Task Save()
+    {
+        error = null;
+        saving = true;
+
+        newMember.MembershipPlanId = selectedPlanId;
+        if (string.IsNullOrWhiteSpace(newMember.Phone))
+        {
+            newMember.Phone = null;
+        }
+
+        var result = await Api.CreateMemberAsync(Auth.Token!, newMember);
+        saving = false;
+
+        if (result.Success)
+        {
+            Nav.NavigateTo("/members");
+        }
+        else
+        {
+            error = result.Error;
+        }
+    }
+}
