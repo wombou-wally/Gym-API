@@ -1,33 +1,67 @@
 ﻿@page "/login"
+@layout EmptyLayout
 @inject GymApiClient Api
 @inject AuthState Auth
+@inject NavigationManager Nav
 
-<PageTitle>Login</PageTitle>
+<PageTitle>Sign in</PageTitle>
 
-<h1>Login</h1>
+<div class="login-page">
+    <div class="login-card">
+        <div class="login-hero">
+            <h1>Gym Manager</h1>
+            <p>Members, plans and check-ins in one place.</p>
+        </div>
 
-<input @bind="email" @bind:event="oninput" placeholder="Email" />
-<input type="password" @bind="password" @bind:event="oninput" placeholder="Password" />
-<button @onclick="DoLogin">Login</button>
+        <div class="login-form">
+            <h2>Sign in</h2>
 
-@if (Auth.IsLoggedIn)
-{
-    <p>Logged in as @Auth.Role</p>
-}
+            <input class="form-control login-input"
+                   placeholder="Email"
+                   @bind="email"
+                   @bind:event="oninput" />
 
-@if (error != null)
-{
-    <p>@error</p>
-}
+            <input type="password"
+                   class="form-control login-input"
+                   placeholder="Password"
+                   @bind="password"
+                   @bind:event="oninput"
+                   @onkeydown="HandleKey" />
+
+            <button class="btn btn-primary login-button" @onclick="DoLogin" disabled="@busy">
+                @(busy ? "Signing in..." : "Sign in")
+            </button>
+
+            @if (error != null)
+            {
+                <div class="alert alert-danger mt-3">@error</div>
+            }
+        </div>
+    </div>
+</div>
 
 @code {
     private string email = "";
     private string password = "";
     private string? error;
+    private bool busy;
+
+    private async Task HandleKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await DoLogin();
+        }
+    }
 
     private async Task DoLogin()
     {
+        error = null;
+        busy = true;
+
         var result = await Api.LoginAsync(email, password);
+        busy = false;
+
         if (result == null)
         {
             error = "Invalid email or password.";
@@ -35,7 +69,7 @@
         else
         {
             Auth.SignIn(result.Token, result.Role);
-            error = null;
+            Nav.NavigateTo("/members");
         }
     }
 }

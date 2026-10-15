@@ -4,54 +4,80 @@
 
 <PageTitle>Members</PageTitle>
 
-<h1>Members</h1>
-
 @if (!Auth.IsLoggedIn)
 {
-    <p>Please log in. <a href="/login">Click here to log in</a></p>
+    <div class="alert alert-info">
+        Please log in. <a href="/login">Click here to log in</a>
+    </div>
 }
 else if (error != null)
 {
-    <p>@error</p>
+    <div class="alert alert-danger">@error</div>
 }
 else if (memberslist == null)
 {
-    <p>Loading...</p>
+    <div class="spinner-border" role="status"></div>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Id</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>JoinDate</th>
-                <th>IsActive</th>
-                <th>Plan</th>
-                <th>Trainers</th>
-                <th>ExpiryDate</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var m in memberslist)
-            {
-                <tr>
-                    <td>@m.Id</td>
-                    <td>@m.Name</td>
-                    <td>@m.Email</td>
-                    <td>@m.Phone</td>
-                    <td>@m.JoinDate</td>
-                    <td>@m.IsActive</td>
-                    <td>@(m.Plan?.Name ?? "No plan")</td>
-                    <td>@string.Join(", ",m.Trainers.Select(t => t.Name))</td>
-                    <td>@m.ExpiryDate</td>
-                    @* TODO: JoinDate, IsActive, Plan, Trainers, ExpiryDate *@
-                </tr>
-            }
-        </tbody>
-    </table>
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>Members</span>
+            <a class="btn btn-primary btn-sm" href="/members/add">Add member</a>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Joined</th>
+                        <th>Status</th>
+                        <th>Plan</th>
+                        <th>Trainers</th>
+                        <th>Expires</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < memberslist.Count; i++)
+                    {
+                        var m = memberslist[i];
+                        <tr>
+                            <td>@(i + 1)</td>
+                            <td>@m.Name</td>
+                            <td>@m.Email</td>
+                            <td>@m.Phone</td>
+                            <td>@m.JoinDate.ToString("yyyy-MM-dd")</td>
+                            <td>
+                                @if (m.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td>
+                                @if (m.Plan == null)
+                                {
+                                    <span class="text-muted">No plan</span>
+                                }
+                                else
+                                {
+                                    @m.Plan.Name
+                                }
+                            </td>
+                            <td>@string.Join(", ", m.Trainers.Select(t => t.Name))</td>
+                            <td>@(m.ExpiryDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
 }
 
 @code {
