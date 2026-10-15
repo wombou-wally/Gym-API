@@ -1,0 +1,41 @@
+﻿@page "/login"
+@inject GymApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Login</PageTitle>
+
+<h1>Login</h1>
+
+<input @bind="email" @bind:event="oninput" placeholder="Email" />
+<input type="password" @bind="password" @bind:event="oninput" placeholder="Password" />
+<button @onclick="DoLogin">Login</button>
+
+@if (Auth.IsLoggedIn)
+{
+    <p>Logged in as @Auth.Role</p>
+}
+
+@if (error != null)
+{
+    <p>@error</p>
+}
+
+@code {
+    private string email = "";
+    private string password = "";
+    private string? error;
+
+    private async Task DoLogin()
+    {
+        var result = await Api.LoginAsync(email, password);
+        if (result == null)
+        {
+            error = "Invalid email or password.";
+        }
+        else
+        {
+            Auth.SignIn(result.Token, result.Role);
+            error = null;
+        }
+    }
+}

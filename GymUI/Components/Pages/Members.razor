@@ -1,0 +1,72 @@
+﻿@page "/members"
+@inject GymApiClient Api
+@inject AuthState Auth
+
+<PageTitle>Members</PageTitle>
+
+<h1>Members</h1>
+
+@if (!Auth.IsLoggedIn)
+{
+    <p>Please log in. <a href="/login">Click here to log in</a></p>
+}
+else if (error != null)
+{
+    <p>@error</p>
+}
+else if (memberslist == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>JoinDate</th>
+                <th>IsActive</th>
+                <th>Plan</th>
+                <th>Trainers</th>
+                <th>ExpiryDate</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var m in memberslist)
+            {
+                <tr>
+                    <td>@m.Id</td>
+                    <td>@m.Name</td>
+                    <td>@m.Email</td>
+                    <td>@m.Phone</td>
+                    <td>@m.JoinDate</td>
+                    <td>@m.IsActive</td>
+                    <td>@(m.Plan?.Name ?? "No plan")</td>
+                    <td>@string.Join(", ",m.Trainers.Select(t => t.Name))</td>
+                    <td>@m.ExpiryDate</td>
+                    @* TODO: JoinDate, IsActive, Plan, Trainers, ExpiryDate *@
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private List<MemberResponse>? memberslist;
+    private string? error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (Auth.IsLoggedIn)
+        {
+            memberslist = await Api.GetMembersAsync(Auth.Token!);
+            if (memberslist == null)
+            {
+                error = "Could not load members. Your session may have expired. Please log in again.";
+            }
+        }
+    }
+}

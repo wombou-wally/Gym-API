@@ -1,3 +1,4 @@
 <Solution>
   <Project Path="Gym API/GymAPI.csproj" />
+  <Project Path="GymUI/GymUI.csproj" />
 </Solution>
